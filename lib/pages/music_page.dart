@@ -6,7 +6,9 @@ import '../widgets/format_time.dart';
 
 class MusicPage extends StatefulWidget {
   final int index;
-  const MusicPage({super.key, required this.index});
+  const MusicPage({required this.player, Key? key, required this.index})
+      : super(key: key);
+  final AssetsAudioPlayer player;
 
   @override
   State<MusicPage> createState() => _MusicPageState();
@@ -14,11 +16,42 @@ class MusicPage extends StatefulWidget {
 
 class _MusicPageState extends State<MusicPage> {
   Data data = Data();
-  bool isPlaying = false;
+  IconData plyBtn = Icons.play_arrow;
   Duration duration = Duration.zero;
   Duration position = Duration.zero;
-  IconData plyBtn = Icons.play_arrow;
-  AssetsAudioPlayer player = AssetsAudioPlayer();
+  bool isPlaying = false;
+
+  @override
+  void initState() {
+    widget.player.isPlaying.listen((event) {
+      if (mounted) {
+        setState(() {
+          isPlaying = event;
+        });
+      }
+    });
+
+    widget.player.onReadyToPlay.listen((newDuration) {
+      if (mounted) {
+        setState(() {
+          duration = newDuration?.duration ?? Duration.zero;
+        });
+      }
+    });
+
+    widget.player.currentPosition.listen((newPosition) {
+      if (mounted) {
+        setState(() {
+          position = newPosition;
+        });
+      }
+    });
+
+    // TODO: Load a banner ad
+
+    super.initState();
+  }
+
   ///////
   final player2 = AssetsAudioPlayer();
   double _currentPosition = 0;
@@ -31,7 +64,7 @@ class _MusicPageState extends State<MusicPage> {
     int index;
     @override
     void dispose() {
-      player.dispose();
+      widget.player.dispose();
       player2.dispose();
       super.dispose();
     }
@@ -140,7 +173,8 @@ class _MusicPageState extends State<MusicPage> {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
-                    child: Image.asset(data.list[widget.index]["coverUrl"]!),
+                    child: Image.asset(
+                        widget.player.getCurrentAudioImage?.path ?? ''),
                     height: 300,
                     width: 200,
                   ),
@@ -161,7 +195,7 @@ class _MusicPageState extends State<MusicPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  data.list[widget.index]["title"]!,
+                                  widget.player.getCurrentAudioTitle,
                                   style: TextStyle(
                                     color: Colors.white.withOpacity(0.9),
                                     fontSize: 24,
@@ -170,7 +204,7 @@ class _MusicPageState extends State<MusicPage> {
                                 ),
                                 SizedBox(height: 10),
                                 Text(
-                                  data.list[widget.index]["singer"]!,
+                                  widget.player.getCurrentAudioArtist,
                                   style: TextStyle(
                                     color: Colors.white.withOpacity(0.8),
                                     fontSize: 18,
@@ -204,17 +238,13 @@ class _MusicPageState extends State<MusicPage> {
                           ),
                           */
                           Slider(
-                            value: _currentPosition,
-                            onChanged: (value) {
-                              setState(() {
-                                _currentPosition = value;
-                              });
-                              player2.seek(Duration(
-                                  milliseconds:
-                                      (_currentPosition * 1000).toInt()));
+                            value: position.inSeconds.toDouble(),
+                            onChanged: (value) async {
+                              await widget.player
+                                  .seek(Duration(seconds: value.toInt()));
                             },
                             min: 0,
-                            max: _maxDuration,
+                            max: duration.inSeconds.toDouble(),
                           ),
                           Padding(
                             padding: EdgeInsets.symmetric(horizontal: 25),
@@ -258,14 +288,19 @@ class _MusicPageState extends State<MusicPage> {
                             icon: Icon(Icons.skip_previous),
                             color: Colors.white,
                             iconSize: 30,
-                            onPressed: () {},
+                            onPressed: () async {
+                              await widget.player.previous();
+                            },
                           ),
                           CircleAvatar(
                             radius: 25,
                             child: IconButton(
                               iconSize: 25,
-                              onPressed: () {
-                                if (!isPlaying) {
+                              onPressed: () async {
+                                await widget.player.playOrPause();
+                              },
+                              /* onPressed: () {
+                                /* if (!isPlaying) {
                                   player2.open(
                                     Audio(data.list[widget.index]["url"]!),
                                   );
@@ -279,10 +314,11 @@ class _MusicPageState extends State<MusicPage> {
                                     plyBtn = Icons.play_arrow;
                                     isPlaying = false;
                                   });
-                                }
-                              },
+                                }*/
+                              },*/
+
                               icon: Icon(
-                                plyBtn,
+                                isPlaying! ? Icons.pause : Icons.play_arrow,
                                 color: Colors.white,
                                 //size: 50,
                               ),
@@ -305,7 +341,9 @@ class _MusicPageState extends State<MusicPage> {
                             icon: Icon(Icons.skip_next),
                             color: Colors.white,
                             iconSize: 30,
-                            onPressed: () {},
+                            onPressed: () async {
+                              await widget.player.next();
+                            },
                           ),
                           IconButton(
                             icon: const Icon(
@@ -314,7 +352,7 @@ class _MusicPageState extends State<MusicPage> {
                             ),
                             iconSize: 32,
                             onPressed: () async {
-                              await player2.stop();
+                              await widget.player.stop();
                             },
                           ),
                         ],
